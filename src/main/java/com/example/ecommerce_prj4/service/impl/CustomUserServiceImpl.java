@@ -5,7 +5,6 @@ import com.example.ecommerce_prj4.modal.Seller;
 import com.example.ecommerce_prj4.modal.User;
 import com.example.ecommerce_prj4.repository.SellerRepository;
 import com.example.ecommerce_prj4.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -15,7 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
-@RequiredArgsConstructor
+
 @Service
 public class CustomUserServiceImpl implements UserDetailsService {
     private final UserRepository userRepository;
@@ -49,7 +48,7 @@ public class CustomUserServiceImpl implements UserDetailsService {
         if (role == null) role = USER_ROLE.ROLE_USER;
 
         List<GrantedAuthority> authorityList = new ArrayList<>();
-        authorityList.add(new SimpleGrantedAuthority("ROLE_" + role));
+        authorityList.add(new SimpleGrantedAuthority( role.toString()));
         return new org.springframework.security.core.userdetails.User(email,
                 password,
                 authorityList);
