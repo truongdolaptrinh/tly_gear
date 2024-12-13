@@ -3,6 +3,7 @@ package com.example.ecommerce_prj4.controller;
 import com.example.ecommerce_prj4.domain.USER_ROLE;
 import com.example.ecommerce_prj4.modal.VerificationCode;
 import com.example.ecommerce_prj4.repository.UserRepository;
+import com.example.ecommerce_prj4.request.LoginOtpRequest;
 import com.example.ecommerce_prj4.request.LoginRequest;
 import com.example.ecommerce_prj4.respone.ApiRespone;
 import com.example.ecommerce_prj4.respone.AuthRespone;
@@ -45,13 +46,13 @@ public class AuthController {
     }
 
     @PostMapping("/sent/login-signup-otp")
-    public ResponseEntity<ApiRespone> sentOtpHandler(@RequestBody VerificationCode req) throws Exception {
+    public ResponseEntity<ApiRespone> sentOtpHandler(@RequestBody LoginOtpRequest req) throws Exception {
 //        User user = new User();
 //        user.setEmail(req.getEmail());
 //        user.setFullname(req.getFullName());
 //        User savedUser = userRepository.save(user);
 
-        authService.sentLoginOtp(req.getEmail());
+        authService.sentLoginOtp(req.getEmail(),req.getRole());
 
         ApiRespone res = new ApiRespone();
 

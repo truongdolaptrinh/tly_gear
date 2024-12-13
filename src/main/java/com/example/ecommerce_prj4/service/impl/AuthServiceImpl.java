@@ -3,9 +3,11 @@ package com.example.ecommerce_prj4.service.impl;
 import com.example.ecommerce_prj4.config.JwtProvider;
 import com.example.ecommerce_prj4.domain.USER_ROLE;
 import com.example.ecommerce_prj4.modal.Cart;
+import com.example.ecommerce_prj4.modal.Seller;
 import com.example.ecommerce_prj4.modal.User;
 import com.example.ecommerce_prj4.modal.VerificationCode;
 import com.example.ecommerce_prj4.repository.CartRepository;
+import com.example.ecommerce_prj4.repository.SellerRepository;
 import com.example.ecommerce_prj4.repository.UserRepository;
 import com.example.ecommerce_prj4.repository.VerificationCodeRepository;
 import com.example.ecommerce_prj4.request.LoginRequest;
@@ -33,8 +35,9 @@ import java.util.List;
 @Service
 public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
+    private final SellerRepository sellerRepository;
 
-    public AuthServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, CartRepository cartRepository, JwtProvider jwtProvider, VerificationCodeRepository verificationCodeRepository, EmailService emailService, CustomUserServiceImpl customUserServiceImpl) {
+    public AuthServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, CartRepository cartRepository, JwtProvider jwtProvider, VerificationCodeRepository verificationCodeRepository, EmailService emailService, CustomUserServiceImpl customUserServiceImpl, SellerRepository sellerRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.cartRepository = cartRepository;
@@ -42,6 +45,7 @@ public class AuthServiceImpl implements AuthService {
         this.verificationCodeRepository = verificationCodeRepository;
         this.emailService = emailService;
         this.customUserServiceImpl = customUserServiceImpl;
+        this.sellerRepository = sellerRepository;
     }
 
     private final PasswordEncoder passwordEncoder;
@@ -52,17 +56,28 @@ public class AuthServiceImpl implements AuthService {
     private final CustomUserServiceImpl customUserServiceImpl;
 
     @Override
-    public void sentLoginOtp(String email) throws Exception {
-        String SIGNING_PREFIX="signin_";
-        if(email.startsWith(SIGNING_PREFIX)){
+    public void sentLoginOtp(String email, USER_ROLE role) throws Exception {
+        String SIGNING_PREFIX = "signing_";
+//        String SELLER_PREFIX = "seller_";
+        if (email.startsWith(SIGNING_PREFIX)) {
             email = email.substring(SIGNING_PREFIX.length());
-            User user = userRepository.findByEmail(email);
-            if(user == null){
-                throw new Exception("User not exist with provided email");
+            if (role.equals(USER_ROLE.ROLE_SELLER)) {
+                Seller seller = sellerRepository.findByEmail(email);
+                if (seller == null) {
+                    throw new Exception("seller not found");
+                }
+
+            } else {
+                System.out.println("email "+email);
+                User user = userRepository.findByEmail(email);
+                if (user == null) {
+                    throw new Exception("User not exist with provided email");
+                }
             }
+
         }
         VerificationCode isExist = verificationCodeRepository.findByEmail(email);
-        if(isExist != null){
+        if (isExist != null) {
             verificationCodeRepository.delete(isExist);
         }
         String otp = OtpUtil.generateOtp();
@@ -72,14 +87,14 @@ public class AuthServiceImpl implements AuthService {
         verificationCodeRepository.save(verificationCode);
         String subjects = "khiem login/signup otp";
         String text = "your login/signup otp is -" + otp;
-        emailService.sendVerificationMail(email,otp,subjects,text);
+        emailService.sendVerificationMail(email, otp, subjects, text);
     }
 
     @Override
     public String createUser(SignupRequest req) throws Exception {
         VerificationCode verificationCode = verificationCodeRepository.findByEmail(req.getEmail());
 
-        if(verificationCode == null || !verificationCode.getOtp().equals(req.getOtp())) {
+        if (verificationCode == null || !verificationCode.getOtp().equals(req.getOtp())) {
             throw new Exception("Wrong OTP....");
         }
 
@@ -101,16 +116,16 @@ public class AuthServiceImpl implements AuthService {
         List<GrantedAuthority> authorities = new ArrayList<>();
         authorities.add(new SimpleGrantedAuthority(USER_ROLE.ROLE_USER.toString()));
 
-        Authentication authentication = new UsernamePasswordAuthenticationToken(req.getEmail(), null, authorities );
+        Authentication authentication = new UsernamePasswordAuthenticationToken(req.getEmail(), null, authorities);
         SecurityContextHolder.getContext().setAuthentication(authentication);
         return jwtProvider.generateToken(authentication);
     }
 
     @Override
-    public AuthRespone signing(LoginRequest req) {
+    public AuthRespone signing(LoginRequest req) throws Exception {
         String username = req.getEmail();
-        String otp=req.getOtp();
-        Authentication authentication = authenticate(username,otp);
+        String otp = req.getOtp();
+        Authentication authentication = authenticate(username, otp);
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String token = jwtProvider.generateToken(authentication);
         AuthRespone authRespone = new AuthRespone();
@@ -118,18 +133,25 @@ public class AuthServiceImpl implements AuthService {
         authRespone.setMessage("Login Success");
 
         Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
-        String roleName = authorities.isEmpty()?null:authorities.iterator().next().getAuthority();
+        String roleName = authorities.isEmpty() ? null : authorities.iterator().next().getAuthority();
         authRespone.setRole(USER_ROLE.valueOf(roleName));
         return authRespone;
     }
 
-    private Authentication authenticate(String username, String otp) {
+    private Authentication authenticate(String username, String otp) throws Exception {
         UserDetails userDetails = customUserServiceImpl.loadUserByUsername(username);
-        if(userDetails == null){
-            throw new BadCredentialsException("Invalid username or password");
+
+        String SELLER_PREFIX = "seller_";
+
+        if (username.startsWith(SELLER_PREFIX)) {
+            username = username.substring(SELLER_PREFIX.length());
+        }
+
+        if (userDetails == null) {
+            throw new Exception("Invalid username or password");
         }
         VerificationCode verificationCode = verificationCodeRepository.findByEmail(username);
-        if(verificationCode == null || !verificationCode.getOtp().equals(otp)){
+        if (verificationCode == null || !verificationCode.getOtp().equals(otp)) {
             throw new BadCredentialsException("Wrong OTP!");
         }
         return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
